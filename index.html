@@ -13,7 +13,7 @@
   ════════════════════════════════════════════════════════════════
   -->
   <script>
-    window.GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyTVZvhhD16iMt9Nrc5POJWf8EXnPjxo18C5kHSo8ViYxqCCWZhM4XukGyTAKg0sXKNZw/exec';
+    window.GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwqh5vt1o-9wRy-6BmbHsv70VFqAlwUDBZmz6b328BNsVGqcWcMv_CIIs_HzHK1HoPSmg/exec';
   </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -463,11 +463,14 @@
     const [wrongTasks, setWrongTasks] = useState([]);
     const [correctItems, setCorrectItems] = useState([]);
     const [incorrectItems, setIncorrectItems] = useState([]);
+    const [firstTryItems, setFirstTryItems] = useState([]);   // 한번에 푼 문제
+    const [retryItems, setRetryItems] = useState([]);         // 다시 푼 문제
     const [showWrongPopup, setShowWrongPopup] = useState(false);
     const [lastWrongAnswer, setLastWrongAnswer] = useState('');
     const learningDate = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
     const [attempts, setAttempts] = useState(0);
+    const attemptsRef = useRef(0);   // 즉시 반영용 시도 횟수
     const [students, setStudents] = useState([]);
     const [isLoadingNames, setIsLoadingNames] = useState(true);
     const [recordStatus, setRecordStatus] = useState('');
@@ -508,6 +511,8 @@
         questionCount: totalCount, score: `${correctCount}/${totalCount}`,
         correctItems: (cItems||[]).map(i => i.char),
         incorrectItems: (iItems||[]).map(i => i.char),
+        firstTryCount: firstTryItems.length,
+        retryCount: retryItems.length,
         voiceItems: voiceRecords.slice(0,4).map(r => `${r.task}: ${r.text}`)
       }).then(() => setRecordStatus('saved')).catch(() => setRecordStatus('error'));
     };
@@ -612,8 +617,8 @@
       setTutorialStep(1); setTutorialSubStep(0); setTutorialEditPhase(false);
       setTutorialSlotFilled([true,true,true,true]); setShowTutorial(true);
       setStage('level_active'); setProgress(0); setWrongTasks([]);
-      setCorrectItems([]); setIncorrectItems([]);
-      setCurrentTaskIndex(0); setAttempts(0); setVoiceRecords([]);
+      setCorrectItems([]); setIncorrectItems([]); setFirstTryItems([]); setRetryItems([]);
+      setCurrentTaskIndex(0); setAttempts(0); attemptsRef.current=0; setVoiceRecords([]);
       setHasReviewed(false); setTutorialVoiceStep(1);
       const selected = [...levelData[lvl].items].sort(()=>Math.random()-.5).slice(0,Math.min(count,levelData[lvl].items.length));
       setActiveItems(selected); setCurrentTask(selected[0]); setUserInput([]);
@@ -665,7 +670,7 @@
     };
 
     const handleFailure = (wrong='') => {
-      playWrong(); setAttempts(a=>a+1); setLastWrongAnswer(wrong); setShowWrongPopup(true);
+      attemptsRef.current += 1; playWrong(); setAttempts(a=>a+1); setLastWrongAnswer(wrong); setShowWrongPopup(true);
       if (!incorrectItems.some(i=>i.char===currentTask.char)) setIncorrectItems(prev=>[...prev,currentTask]);
       speak(buildFailureSpeech(wrong));
     };
@@ -673,8 +678,18 @@
       playChime();
       if (window.confetti) window.confetti({particleCount:100,spread:70,origin:{y:.6},colors:['#FACC15','#4ADE80','#60A5FA','#F472B6'],useWorker:false});
       setFeedbackText('정답이야! 참 잘했어!'); setShowCompletePopup(true); setStars(s=>s+1);
-      if (attempts===0 && !incorrectItems.some(i=>i.char===currentTask.char) && !correctItems.some(i=>i.char===currentTask.char))
+      if (attemptsRef.current===0 && !incorrectItems.some(i=>i.char===currentTask.char) && !correctItems.some(i=>i.char===currentTask.char))
         setCorrectItems(prev=>[...prev,currentTask]);
+      // 한번에 / 다시 분류 (review_wrong 제외)
+      if (stage!=='review_wrong') {
+        if (attemptsRef.current===0) {
+          if (!firstTryItems.some(i=>i.char===currentTask.char))
+            setFirstTryItems(prev=>[...prev,currentTask]);
+        } else {
+          if (!retryItems.some(i=>i.char===currentTask.char))
+            setRetryItems(prev=>[...prev,currentTask]);
+        }
+      }
       speak(buildSuccessSpeech(currentTask));
       setVoiceText(''); setVoiceSaved(false); setIsRecording(false); setVoiceFeedback(null);
     };
@@ -685,7 +700,7 @@
       setProgress(prev=>Math.min(prev+100/items.length,100));
       const nextIdx = currentTaskIndex+1; setCurrentTaskIndex(nextIdx);
       if (nextIdx < items.length) {
-        setCurrentTask(items[nextIdx]); setUserInput([]); setAttempts(0);
+        setCurrentTask(items[nextIdx]); setUserInput([]); setAttempts(0); attemptsRef.current=0;
         setTimeout(()=>speakTaskSound(items[nextIdx],false),500);
       } else {
         setStage('complete');
@@ -802,11 +817,7 @@
         background:'linear-gradient(135deg,#FFF0FB 0%,#FFF8E7 40%,#F0F8FF 100%)'
       }}>
 
-        {/* Floating deco */}
-        <div style={{position:'fixed',top:'3%',left:'4%',fontSize:'2.2rem',animation:'bounce 2.8s ease-in-out infinite',pointerEvents:'none',zIndex:0}}>⭐</div>
-        <div style={{position:'fixed',top:'8%',right:'5%',fontSize:'2rem',animation:'bounce 3.2s ease-in-out infinite 0.4s',pointerEvents:'none',zIndex:0}}>🌈</div>
-        <div style={{position:'fixed',bottom:'6%',left:'3%',fontSize:'1.8rem',animation:'bounce 2.5s ease-in-out infinite 0.8s',pointerEvents:'none',zIndex:0}}>🌟</div>
-        <div style={{position:'fixed',bottom:'8%',right:'4%',fontSize:'2rem',animation:'bounce 3s ease-in-out infinite 0.2s',pointerEvents:'none',zIndex:0}}>🎈</div>
+        
 
         {/* Mute btn intro/name */}
         {(stage==='intro'||stage==='select_name') && (
@@ -829,12 +840,14 @@
             zIndex:30, padding:'0 1rem'
           }}>
             <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-              <button onClick={()=>setStage('intro')} className="btn-sticker" style={{
-                padding:'0.7rem 1.2rem', fontSize:'1.4rem',
+              <button onClick={()=>setStage('intro')} style={{
+                padding:'0.6rem 1.1rem', fontSize:'1.4rem',
                 background:'white', color:'#4CAF50',
                 border:'2px solid #C8E6C9', borderBottom:'5px solid #81C784',
-                boxShadow:'0 4px 0 #81C784', cursor:'pointer'
-              }}>🏠</button>
+                boxShadow:'0 4px 0 #81C784', cursor:'pointer',
+                borderRadius:'1.2rem', fontWeight:900,
+                transition:'all 0.15s cubic-bezier(0.34,1.56,0.64,1)'
+              }}>🏠 홈</button>
               {stage!=='select_level' && (
                 <button onClick={()=>setStage('select_level')} className="btn-sticker" style={{
                   padding:'0.5rem 1rem', fontSize:'1rem', fontWeight:900,
@@ -848,16 +861,17 @@
               <div style={{width:'100%',height:'100%',borderRadius:'999px',background:'#F1F5F9',border:'2px solid #E2E8F0',overflow:'hidden',boxShadow:'inset 0 2px 4px rgba(0,0,0,0.06)'}}>
                 <div className="progress-bar" style={{height:'100%',borderRadius:'999px',background:'linear-gradient(90deg,#FF6B6B,#FFD93D,#6BCB77)',width:`${progress}%`,boxShadow:'0 0 10px rgba(255,150,0,0.5)'}}/>
               </div>
-              {progress>10 && <div style={{position:'absolute',top:'-8px',left:`calc(${progress}% - 12px)`,fontSize:'1.4rem',animation:'bounce 0.8s ease-in-out infinite'}}>⭐</div>}
             </div>
             <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-              <button onClick={toggleMute} className="btn-sticker" style={{
-                padding:'0.5rem 0.8rem', fontSize:'1.3rem',
+              <button onClick={toggleMute} style={{
+                padding:'0.5rem 0.9rem', fontSize:'1.3rem',
                 background: isMuted ? '#E2E8F0' : 'linear-gradient(135deg,#FF6B6B,#FF8E53)',
                 color: isMuted ? '#94A3B8' : 'white',
                 border:'none', borderBottom: isMuted ? '4px solid #CBD5E1' : '4px solid #CC4A1A',
-                boxShadow: isMuted ? '0 3px 0 #CBD5E1' : '0 3px 0 #CC4A1A', cursor:'pointer'
-              }}>{isMuted?'🔇':'🔊'}</button>
+                boxShadow: isMuted ? '0 3px 0 #CBD5E1' : '0 3px 0 #CC4A1A', cursor:'pointer',
+                borderRadius:'1.2rem', fontWeight:900,
+                transition:'all 0.15s cubic-bezier(0.34,1.56,0.64,1)'
+              }}>{isMuted?'🔇 소리꺼짐':'🔊 소리켜짐'}</button>
               <div style={{background:'linear-gradient(135deg,#E0F2FE,#BAE6FD)',padding:'0.5rem 1rem',borderRadius:'999px',border:'2px solid #7DD3FC',boxShadow:'0 3px 0 #7DD3FC',fontSize:'1.1rem',fontWeight:900,color:'#0369A1',whiteSpace:'nowrap'}}>
                 👤 {studentName} 친구
               </div>
@@ -867,31 +881,69 @@
 
         {/* ══ INTRO ══ */}
         {stage==='intro' && (
-          <div key="intro" className="page-enter" style={{display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center',width:'100%',maxWidth:'900px',padding:'0 1rem',position:'relative',zIndex:1}}>
+          <div key="intro" className="page-enter" style={{display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center',width:'100%',maxWidth:'720px',padding:'0 1.5rem',position:'relative',zIndex:1,gap:'1rem'}}>
+
             <PencilFairy className="mb-2"/>
-            <div style={{background:'linear-gradient(135deg,#FF9A9E,#FECFEF)',color:'white',padding:'0.6rem 2rem',borderRadius:'999px',fontSize:'1.5rem',fontWeight:900,marginBottom:'0.8rem',boxShadow:'0 5px 0 rgba(255,100,130,0.4)'}}>
+
+            {/* 학년군 뱃지 */}
+            <div style={{background:'linear-gradient(135deg,#FF9A9E,#FECFEF)',color:'white',padding:'0.5rem 1.8rem',borderRadius:'999px',fontSize:'1.3rem',fontWeight:900,boxShadow:'0 4px 0 rgba(255,100,130,0.35)'}}>
               📚 국어 1-2학년군
             </div>
-            <h1 style={{fontSize:'clamp(3rem,8vw,6rem)',fontWeight:900,margin:'0 0 1rem',letterSpacing:'-0.03em',lineHeight:1.1,background:'linear-gradient(135deg,#FF6B6B,#FF8E53,#FFD93D)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',filter:'drop-shadow(0 4px 8px rgba(255,100,50,0.25))'}}>
+
+            {/* 타이틀 */}
+            <h1 style={{fontSize:'clamp(3.2rem,9vw,6rem)',fontWeight:900,margin:'0',letterSpacing:'-0.03em',lineHeight:1.05,background:'linear-gradient(135deg,#FF6B6B,#FF8E53,#FFD93D)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',filter:'drop-shadow(0 4px 8px rgba(255,100,50,0.25))'}}>
               한글자모탐험
             </h1>
-            <div style={{background:'white',borderRadius:'2rem',padding:'1.5rem 2.5rem',marginBottom:'1.5rem',width:'100%',maxWidth:'600px',boxShadow:'0 10px 0 #FFE4C8, 0 14px 30px rgba(255,150,80,0.15)',border:'3px solid #FFD4A3',position:'relative'}}>
-              <div style={{position:'absolute',top:'-1.2rem',left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:'white',padding:'0.4rem 1.5rem',borderRadius:'999px',fontSize:'1.1rem',fontWeight:900,whiteSpace:'nowrap',boxShadow:'0 4px 0 rgba(200,80,30,0.4)'}}>
-                🔊 오늘의 공부 약속
+
+            {/* 🎯 학습목표 안내 박스 (백워드 설계) */}
+            <div style={{background:'#FFFBEB',border:'3px solid #FDE68A',borderRadius:'1.6rem',padding:'1.8rem 2.2rem',width:'100%',boxShadow:'0 6px 0 #FCD34D',position:'relative',textAlign:'left'}}>
+              {/* 헤더 뱃지 */}
+              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.9rem'}}>
+                <span style={{fontSize:'2rem'}}>🎯</span>
+                <span style={{fontSize:'1.5rem',fontWeight:900,color:'#92400E',letterSpacing:'-0.01em'}}>오늘 활동이 끝나면 이걸 할 수 있어요!</span>
               </div>
-              <p style={{fontSize:'1.6rem',fontWeight:900,color:'#374151',margin:'0.5rem 0 0',lineHeight:1.5}}>
-                소리를 잘 듣고<br/><span style={{color:'#FF6B6B'}}>알맞은 글자</span>를 찾아볼까요? 🎵
-              </p>
+              {/* 목표 목록 */}
+              <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.55rem'}}>
+                {[
+                  {icon:'👂', text:'소리를 듣고 ', bold:'자음과 모음을 구별', after:'할 수 있어요'},
+                  {icon:'🔤', text:'자음과 모음을 합쳐서 ', bold:'한 글자를 만들', after:' 수 있어요'},
+                  {icon:'🗣️', text:'글자를 보고 ', bold:'소리 내어 읽', after:'을 수 있어요'},
+                ].map((item,i)=>(
+                  <li key={i} style={{display:'flex',alignItems:'center',gap:'0.8rem',background:'white',borderRadius:'1rem',padding:'0.85rem 1.2rem',border:'2px solid #FDE68A',fontSize:'1.35rem',fontWeight:700,color:'#374151',lineHeight:1.4}}>
+                    <span style={{fontSize:'1.7rem',flexShrink:0}}>{item.icon}</span>
+                    <span>{item.text}<span style={{color:'#D97706',fontWeight:900,fontSize:'1.35rem'}}>{item.bold}</span>{item.after}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <button onClick={()=>{initAudio();setStage('select_name');}} className="btn-sticker" style={{
-              width:'100%',maxWidth:'400px',padding:'1.4rem 2rem',
+
+
+            {/* 🚀 활동 시작하기 버튼 — 둥근 사각형 */}
+            <button onClick={()=>{initAudio();setStage('select_name');}} style={{
+              width:'100%', maxWidth:'420px',
+              padding:'1.3rem 2rem',
               background:'linear-gradient(135deg,#FF6B6B,#FF8E53)',
-              color:'white',border:'none',borderBottom:'8px solid #CC4A1A',
-              boxShadow:'0 8px 0 #CC4A1A, 0 16px 40px rgba(255,100,60,0.3)',
-              fontSize:'2rem',fontWeight:900,cursor:'pointer',
-              display:'flex',alignItems:'center',justifyContent:'center',gap:'0.75rem'
-            }}>🚀 활동 시작하기!</button>
-            <p style={{marginTop:'1rem',color:'#94A3B8',fontSize:'1.1rem',fontWeight:700}}>🔊 위 버튼을 눌러 소리를 켜고 시작하세요!</p>
+              color:'white',
+              border:'none',
+              borderRadius:'1.4rem',
+              borderBottom:'7px solid #CC4A1A',
+              boxShadow:'0 7px 0 #CC4A1A, 0 14px 36px rgba(255,100,60,0.3)',
+              fontSize:'1.9rem', fontWeight:900, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:'0.7rem',
+              transition:'all 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+              letterSpacing:'-0.01em'
+            }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.03) translateY(-2px)'; e.currentTarget.style.filter='brightness(1.06)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1) translateY(0)'; e.currentTarget.style.filter='brightness(1)'; }}
+              onMouseDown={e=>{ e.currentTarget.style.transform='scale(0.96) translateY(4px)'; e.currentTarget.style.borderBottomWidth='2px'; }}
+              onMouseUp={e=>{ e.currentTarget.style.transform='scale(1.03) translateY(-2px)'; e.currentTarget.style.borderBottomWidth='7px'; }}
+            >
+              🚀 활동 시작하기!
+            </button>
+
+            <p style={{color:'#94A3B8',fontSize:'1rem',fontWeight:700,marginTop:'-0.2rem'}}>
+              🔊 위 버튼을 눌러 소리를 켜고 시작하세요!
+            </p>
           </div>
         )}
 
@@ -940,21 +992,32 @@
         {stage==='select_level' && (
           <div key="select" className="page-enter" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'1.2rem',width:'100%',maxWidth:'900px',marginTop:'5rem',padding:'0 1rem',position:'relative',zIndex:1}}>
             {[
-              {num:1,emoji:'🅐',sub:'모음 소리',color:'#FF9EC4',border:'#FF6BA8',shadow:'#D4457F',bg:'#FFF0F7'},
-              {num:2,emoji:'🅑',sub:'자음 소리',color:'#79C8FF',border:'#4AAFF0',shadow:'#1A7ABF',bg:'#F0F8FF'},
-              {num:3,emoji:'🅒',sub:'한 글자',color:'#A3E89A',border:'#5DCB54',shadow:'#2A9F21',bg:'#F0FFF0'},
-              {num:4,emoji:'🅓',sub:'두 글자',color:'#FFCA72',border:'#F0A800',shadow:'#BD7E00',bg:'#FFFAF0'},
+              {num:1,sub:'모음 소리',color:'#FF9EC4',border:'#FF6BA8',shadow:'#D4457F',bg:'#FFF0F7'},
+              {num:2,sub:'자음 소리',color:'#79C8FF',border:'#4AAFF0',shadow:'#1A7ABF',bg:'#F0F8FF'},
+              {num:3,sub:'한 글자',  color:'#A3E89A',border:'#5DCB54',shadow:'#2A9F21',bg:'#F0FFF0'},
+              {num:4,sub:'두 글자',  color:'#FFCA72',border:'#F0A800',shadow:'#BD7E00',bg:'#FFFAF0'},
             ].map(item=>(
-              <button key={item.num} onClick={()=>selectLevel(item.num)} className="btn-sticker" style={{
-                background:item.bg,border:`4px solid ${item.border}`,
+              <button key={item.num} onClick={()=>selectLevel(item.num)} style={{
+                background:item.bg, border:`4px solid ${item.border}`,
                 borderBottom:`10px solid ${item.shadow}`,
                 boxShadow:`0 10px 0 ${item.shadow}`,
-                borderRadius:'2rem',padding:'2rem 1.5rem',cursor:'pointer',
-                display:'flex',flexDirection:'column',alignItems:'center',gap:'0.75rem',minHeight:'160px'
-              }}>
-                <div style={{fontSize:'3.5rem',lineHeight:1}}>{item.emoji}</div>
-                <div style={{fontSize:'1.6rem',fontWeight:900,color:item.shadow}}>{item.num}단계</div>
-                <div style={{background:item.color,padding:'0.4rem 1.2rem',borderRadius:'999px',fontSize:'1.2rem',fontWeight:900,boxShadow:`0 3px 0 ${item.shadow}`}}>{item.sub}</div>
+                borderRadius:'2rem', padding:'2rem 1.5rem', cursor:'pointer',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:'1rem',
+                minHeight:'180px',
+                transition:'all 0.18s cubic-bezier(0.34,1.56,0.64,1)'
+              }}
+                onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-4px)'; e.currentTarget.style.filter='brightness(1.04)';}}
+                onMouseLeave={e=>{e.currentTarget.style.transform='scale(1) translateY(0)'; e.currentTarget.style.filter='brightness(1)';}}
+                onMouseDown={e=>{e.currentTarget.style.transform='scale(0.97) translateY(4px)'; e.currentTarget.style.borderBottomWidth='3px';}}
+                onMouseUp={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-4px)'; e.currentTarget.style.borderBottomWidth='10px';}}
+              >
+                <div style={{fontSize:'3rem',fontWeight:900,color:item.shadow}}>{item.num}단계</div>
+                <div style={{
+                  background:item.color, color:item.shadow,
+                  padding:'0.6rem 1.6rem', borderRadius:'1rem',
+                  fontSize:'1.8rem', fontWeight:900,
+                  boxShadow:`0 4px 0 ${item.shadow}`
+                }}>{item.sub}</div>
               </button>
             ))}
           </div>
@@ -970,26 +1033,26 @@
             )}
             <div className="game-split" style={{display:'flex',gap:'0.75rem',maxHeight:'88vh'}}>
               {/* Left */}
-              <div className="game-left" style={{background:'white',borderRadius:'2rem',padding:'1.5rem',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',minHeight:'22rem',boxShadow:'0 10px 0 #FFD4A3',border:'3px solid #FFE4C8'}}>
-                <div style={{position:'absolute',top:'1rem',left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:'white',padding:'0.4rem 1.5rem',borderRadius:'999px',fontSize:'1.1rem',fontWeight:900,whiteSpace:'nowrap',boxShadow:'0 4px 0 rgba(200,80,30,0.4)',zIndex:10}}>{levelData[level].name}</div>
-                <div style={{background:'#FFF8E7',border:'2px dashed #FFD4A3',borderRadius:'1.5rem',padding:'3rem 2rem 1.5rem',marginBottom:'1rem',width:'100%',maxWidth:level===4?'480px':level===3?'320px':'240px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',marginTop:'2.5rem'}}>
-                  <div style={{position:'absolute',top:'0.75rem',color:'#F0A800',fontWeight:900,fontSize:'1.1rem'}}>📝 문제 {currentTaskIndex+1} / {(stage==='review_wrong'?wrongTasks:activeItems).length}</div>
+              <div className="game-left" style={{background:'white',borderRadius:'2rem',padding:'2.2rem 2rem',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',minHeight:'26rem',boxShadow:'0 10px 0 #FFD4A3',border:'3px solid #FFE4C8'}}>
+                <div style={{position:'absolute',top:'1rem',left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:'white',padding:'0.55rem 1.8rem',borderRadius:'999px',fontSize:'1.4rem',fontWeight:900,whiteSpace:'nowrap',boxShadow:'0 5px 0 rgba(200,80,30,0.4)',zIndex:10}}>{levelData[level].name}</div>
+                <div style={{background:'#FFF8E7',border:'2px dashed #FFD4A3',borderRadius:'1.5rem',padding:'3.5rem 2.5rem 2rem',marginBottom:'1.2rem',width:'100%',maxWidth:level===4?'560px':level===3?'380px':'300px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',marginTop:'3rem'}}>
+                  <div style={{position:'absolute',top:'0.9rem',color:'#F0A800',fontWeight:900,fontSize:'1.3rem'}}>📝 문제 {currentTaskIndex+1} / {(stage==='review_wrong'?wrongTasks:activeItems).length}</div>
                   {level<=2 && (()=>{
                     const ch=userInput[0],isVT=level===1;
-                    return <div title={ch?'눌러서 지우기':''} onClick={()=>ch&&setUserInput([])} style={{width:'8rem',height:'8rem',borderRadius:'1.5rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4.5rem',fontWeight:900,background:ch?(isVT?'#FF9EC4':'#79C8FF'):'white',color:ch?'white':'#E2E8F0',border:ch?`5px solid ${isVT?'#FF6BA8':'#4AAFF0'}`:'4px dashed #E2E8F0',boxShadow:ch?`0 8px 0 ${isVT?'#D4457F':'#1A7ABF'}`:'0 4px 0 #E2E8F0',cursor:ch?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>{ch||'?'}</div>;
+                    return <div title={ch?'눌러서 지우기':''} onClick={()=>ch&&setUserInput([])} style={{width:'10rem',height:'10rem',borderRadius:'1.8rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'6rem',fontWeight:900,background:ch?(isVT?'#FF9EC4':'#79C8FF'):'white',color:ch?'white':'#E2E8F0',border:ch?`5px solid ${isVT?'#FF6BA8':'#4AAFF0'}`:'4px dashed #E2E8F0',boxShadow:ch?`0 8px 0 ${isVT?'#D4457F':'#1A7ABF'}`:'0 4px 0 #E2E8F0',cursor:ch?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>{ch||'?'}</div>;
                   })()}
                   {level===3 && (()=>{
                     const c=userInput.find(isConsonant),v=userInput.find(vv=>vowels.some(vo=>vo.char===vv));
                     const tV=currentTask.parts.find(p=>vowels.some(vo=>vo.char===p));
                     const side=tV&&isVowelSide(tV);
-                    const sty=(color,border,shadow,filled)=>({width:'5.5rem',height:'5.5rem',borderRadius:'1.2rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3rem',fontWeight:900,background:filled?color:'white',color:filled?'white':'#E2E8F0',border:filled?`4px solid ${border}`:'3px dashed #E2E8F0',boxShadow:filled?`0 6px 0 ${shadow}`:'0 3px 0 #E2E8F0',cursor:filled?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'});
+                    const sty=(color,border,shadow,filled)=>({width:'7rem',height:'7rem',borderRadius:'1.4rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem',fontWeight:900,background:filled?color:'white',color:filled?'white':'#E2E8F0',border:filled?`4px solid ${border}`:'3px dashed #E2E8F0',boxShadow:filled?`0 6px 0 ${shadow}`:'0 3px 0 #E2E8F0',cursor:filled?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'});
                     return <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.5rem',flexDirection:side?'row':'column'}}>
                       <div style={sty('#79C8FF','#4AAFF0','#1A7ABF',!!c)} onClick={()=>c&&setUserInput([])}>{c||'?'}</div>
                       <div style={sty('#FF9EC4','#FF6BA8','#D4457F',!!v)} onClick={()=>v&&setUserInput(prev=>prev.filter(ch=>isConsonant(ch)))}>{v||'?'}</div>
                     </div>;
                   })()}
                   {level===4 && (()=>{
-                    const rp=idx=>{const ch=userInput[idx];const isc=ch&&isConsonant(ch);const c=isc?'#79C8FF':'#FF9EC4';const b=isc?'#4AAFF0':'#FF6BA8';const s=isc?'#1A7ABF':'#D4457F';return <div key={idx} onClick={()=>ch&&setUserInput(prev=>prev.slice(0,idx))} style={{width:'5rem',height:'5rem',borderRadius:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.8rem',fontWeight:900,background:ch?c:'white',color:ch?'white':'#E2E8F0',border:ch?`4px solid ${b}`:'3px dashed #E2E8F0',boxShadow:ch?`0 5px 0 ${s}`:'0 3px 0 #E2E8F0',cursor:ch?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>{ch||'?'}</div>;};
+                    const rp=idx=>{const ch=userInput[idx];const isc=ch&&isConsonant(ch);const c=isc?'#79C8FF':'#FF9EC4';const b=isc?'#4AAFF0':'#FF6BA8';const s=isc?'#1A7ABF':'#D4457F';return <div key={idx} onClick={()=>ch&&setUserInput(prev=>prev.slice(0,idx))} style={{width:'6.5rem',height:'6.5rem',borderRadius:'1.3rem',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3.8rem',fontWeight:900,background:ch?c:'white',color:ch?'white':'#E2E8F0',border:ch?`4px solid ${b}`:'3px dashed #E2E8F0',boxShadow:ch?`0 5px 0 ${s}`:'0 3px 0 #E2E8F0',cursor:ch?'pointer':'default',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>{ch||'?'}</div>;};
                     const lay=vi=>currentTask.parts[vi]&&isVowelSide(currentTask.parts[vi])?'row':'column';
                     return <div style={{display:'flex',gap:'1.2rem',alignItems:'center',justifyContent:'center'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexDirection:lay(1)}}>{rp(0)}{rp(1)}</div>
@@ -997,10 +1060,10 @@
                     </div>;
                   })()}
                 </div>
-                <p style={{fontSize:'1.4rem',fontWeight:900,color:'#FF6B6B',textAlign:'center',marginBottom:'0.8rem'}}>🎧 소리를 듣고 글자를 골라 완성해요!</p>
+                <p style={{fontSize:'1.7rem',fontWeight:900,color:'#FF6B6B',textAlign:'center',marginBottom:'1rem'}}>🎧 소리를 듣고 글자를 골라 완성해요!</p>
                 <div style={{display:'flex',flexDirection:'column',gap:'0.6rem',width:'100%',maxWidth:'340px'}}>
-                  <button onClick={handleReplay} className="btn-sticker" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.75rem',padding:'1rem',fontSize:'1.6rem',fontWeight:900,background:'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:'white',border:'none',borderBottom:'7px solid #CC4A1A',boxShadow:'0 7px 0 #CC4A1A',borderRadius:'1.5rem',cursor:'pointer'}}>🔊 소리 듣기</button>
-                  {userInput.length>0 && <button onClick={handleCheck} className="btn-sticker" style={{padding:'1rem',fontSize:'1.5rem',fontWeight:900,background:'linear-gradient(135deg,#6BCB77,#3EAF4A)',color:'white',border:'none',borderBottom:'7px solid #2A7A2A',boxShadow:'0 7px 0 #2A7A2A',borderRadius:'1.5rem',cursor:'pointer'}}>✅ 정답 확인!</button>}
+                  <button onClick={handleReplay} className="btn-sticker" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.75rem',padding:'1.3rem',fontSize:'2rem',fontWeight:900,background:'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:'white',border:'none',borderBottom:'8px solid #CC4A1A',boxShadow:'0 8px 0 #CC4A1A',borderRadius:'1.5rem',cursor:'pointer'}}>🔊 소리 듣기</button>
+                  {userInput.length>0 && <button onClick={handleCheck} className="btn-sticker" style={{padding:'1.2rem',fontSize:'1.9rem',fontWeight:900,background:'linear-gradient(135deg,#6BCB77,#3EAF4A)',color:'white',border:'none',borderBottom:'8px solid #2A7A2A',boxShadow:'0 8px 0 #2A7A2A',borderRadius:'1.5rem',cursor:'pointer'}}>✅ 정답 확인!</button>}
                 </div>
               </div>
               {/* Right keyboard */}
@@ -1038,43 +1101,128 @@
         {/* ══ COMPLETE ══ */}
         {stage==='complete' && (
           <div key="complete" className="page-enter custom-scrollbar" style={{display:'flex',flexDirection:'column',alignItems:'center',width:'100%',maxWidth:'1000px',padding:'0 1rem',marginTop:'5rem',paddingBottom:'3rem',overflowY:'auto',maxHeight:'calc(100dvh - 2rem)',position:'relative',zIndex:1}}>
-            <div ref={reportRef} style={{background:'white',borderRadius:'2.5rem',padding:'2rem',width:'100%',textAlign:'center',boxShadow:'0 14px 0 #FFD4A3, 0 20px 60px rgba(255,150,80,0.2)',border:'3px solid #FFE4C8'}}>
-              <div style={{fontSize:'4rem',marginBottom:'0.5rem'}}>🏆</div>
-              <h1 style={{fontSize:'2.2rem',fontWeight:900,color:'#FF6B6B',margin:'0 0 1.5rem'}}>[{studentName}] 학습 결과 보고서 🎉</h1>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'0.75rem',marginBottom:'1rem'}}>
+
+            {/* ── 결과 보고서 카드 ── */}
+            <div ref={reportRef} style={{background:'white',borderRadius:'2.5rem',padding:'2.2rem 2.5rem',width:'100%',textAlign:'center',boxShadow:'0 14px 0 #FFD4A3, 0 20px 60px rgba(255,150,80,0.2)',border:'3px solid #FFE4C8'}}>
+
+              {/* 트로피 + 제목 */}
+              <div style={{fontSize:'4.5rem',marginBottom:'0.5rem'}}>🏆</div>
+              <h1 style={{fontSize:'2.6rem',fontWeight:900,color:'#FF6B6B',margin:'0 0 1.5rem',letterSpacing:'-0.02em'}}>
+                [{studentName}] 학습 결과 보고서
+              </h1>
+
+              {/* 정보 카드 3열 */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'0.9rem',marginBottom:'1.2rem'}}>
                 {[
                   {emoji:'👤',label:'학습자',val:`${studentName} 친구`,bg:'#EFF6FF',border:'#BAE6FD',color:'#0369A1'},
                   {emoji:'📚',label:'단계',val:levelData[level].name,bg:'#FFF7ED',border:'#FED7AA',color:'#C2410C'},
                   {emoji:'📅',label:'날짜',val:learningDate,bg:'#F0FDF4',border:'#BBF7D0',color:'#166534'},
                 ].map((c,i)=>(
-                  <div key={i} style={{background:c.bg,border:`2px solid ${c.border}`,borderRadius:'1.5rem',padding:'1rem',textAlign:'left'}}>
-                    <div style={{fontSize:'1.8rem',marginBottom:'0.3rem'}}>{c.emoji}</div>
-                    <div style={{fontSize:'0.9rem',color:'#94A3B8',fontWeight:700}}>{c.label}</div>
-                    <div style={{fontSize:'1.1rem',color:c.color,fontWeight:900,lineHeight:1.2}}>{c.val}</div>
+                  <div key={i} style={{background:c.bg,border:`2px solid ${c.border}`,borderRadius:'1.5rem',padding:'1.1rem 1rem',textAlign:'left'}}>
+                    <div style={{fontSize:'2rem',marginBottom:'0.4rem'}}>{c.emoji}</div>
+                    <div style={{fontSize:'1.05rem',color:'#94A3B8',fontWeight:700,marginBottom:'0.25rem'}}>{c.label}</div>
+                    <div style={{fontSize:'1.35rem',color:c.color,fontWeight:900,lineHeight:1.25}}>{c.val}</div>
                   </div>
                 ))}
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'1rem'}}>
-                <div style={{background:'#F0FDF4',border:'2px solid #BBF7D0',borderRadius:'1.5rem',padding:'1.2rem',textAlign:'left'}}>
-                  <div style={{fontSize:'1.2rem',fontWeight:900,color:'#166534',marginBottom:'0.75rem'}}>✅ 맞힌 글자</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
-                    {correctItems.length>0?correctItems.map((item,i)=><span key={i} style={{padding:'0.6rem 1rem',background:'white',border:'2px solid #BBF7D0',color:'#166534',borderRadius:'0.75rem',fontSize:'2rem',fontWeight:900,boxShadow:'0 3px 0 #BBF7D0'}}>{item.char}</span>):<span style={{color:'#94A3B8',fontWeight:700}}>아직 없어요.</span>}
+
+              {/* 한번에 푼 / 다시 푼 2열 */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.9rem'}}>
+                {/* 한번에 푼 문제 */}
+                <div style={{background:'#F0FDF4',border:'2px solid #BBF7D0',borderRadius:'1.5rem',padding:'1.4rem',textAlign:'left'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.9rem'}}>
+                    <span style={{fontSize:'1.5rem'}}>✅</span>
+                    <span style={{fontSize:'1.4rem',fontWeight:900,color:'#166534'}}>한번에 푼 문제</span>
+                    <span style={{marginLeft:'auto',background:'#BBF7D0',color:'#166534',padding:'0.25rem 0.75rem',borderRadius:'999px',fontSize:'1.1rem',fontWeight:900}}>{firstTryItems.length}개</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.6rem'}}>
+                    {firstTryItems.length>0
+                      ? firstTryItems.map((item,i)=>(
+                          <span key={i} style={{padding:'0.7rem 1.1rem',background:'white',border:'2px solid #BBF7D0',color:'#166534',borderRadius:'0.9rem',fontSize:'2.2rem',fontWeight:900,boxShadow:'0 4px 0 #BBF7D0'}}>{item.char}</span>
+                        ))
+                      : <span style={{color:'#94A3B8',fontWeight:700,fontSize:'1.1rem'}}>아직 없어요.</span>
+                    }
                   </div>
                 </div>
-                <div style={{background:'#FFF1F2',border:'2px solid #FECDD3',borderRadius:'1.5rem',padding:'1.2rem',textAlign:'left'}}>
-                  <div style={{fontSize:'1.2rem',fontWeight:900,color:'#BE123C',marginBottom:'0.75rem'}}>⚠️ 더 연습할 글자</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
-                    {incorrectItems.length>0?incorrectItems.map((item,i)=><span key={i} style={{padding:'0.6rem 1rem',background:'white',border:'2px solid #FECDD3',color:'#BE123C',borderRadius:'0.75rem',fontSize:'2rem',fontWeight:900,boxShadow:'0 3px 0 #FECDD3'}}>{item.char}</span>):<span style={{color:'#94A3B8',fontWeight:700}}>전부 맞혔어요! 🎉</span>}
+
+                {/* 다시 푼 문제 */}
+                <div style={{background:'#FFF7ED',border:'2px solid #FED7AA',borderRadius:'1.5rem',padding:'1.4rem',textAlign:'left'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.9rem'}}>
+                    <span style={{fontSize:'1.5rem'}}>🔄</span>
+                    <span style={{fontSize:'1.4rem',fontWeight:900,color:'#C2410C'}}>다시 푼 문제</span>
+                    <span style={{marginLeft:'auto',background:'#FED7AA',color:'#C2410C',padding:'0.25rem 0.75rem',borderRadius:'999px',fontSize:'1.1rem',fontWeight:900}}>{retryItems.length}개</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'0.6rem'}}>
+                    {retryItems.length>0
+                      ? retryItems.map((item,i)=>(
+                          <span key={i} style={{padding:'0.7rem 1.1rem',background:'white',border:'2px solid #FED7AA',color:'#C2410C',borderRadius:'0.9rem',fontSize:'2.2rem',fontWeight:900,boxShadow:'0 4px 0 #FED7AA'}}>{item.char}</span>
+                        ))
+                      : <span style={{color:'#94A3B8',fontWeight:700,fontSize:'1.1rem'}}>전부 한번에 풀었어요! 🎉</span>
+                    }
                   </div>
                 </div>
               </div>
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:'0.75rem',marginTop:'1.5rem',width:'100%',maxWidth:'680px'}}>
-              {incorrectItems.length>0 && (
-                <button onClick={()=>{setStage('review_wrong');setHasReviewed(true);const wt=[...incorrectItems].sort(()=>Math.random()-.5);setWrongTasks(wt);setCurrentTaskIndex(0);setCurrentTask(wt[0]);setAttempts(0);setUserInput([]);setProgress(0);speak('틀린 문제들을 다시 한 번 풀어보자!');}} className="btn-sticker" style={{padding:'1.3rem',fontSize:'1.6rem',fontWeight:900,background:'linear-gradient(135deg,#818CF8,#6366F1)',color:'white',border:'none',borderBottom:'7px solid #3730A3',boxShadow:'0 7px 0 #3730A3',borderRadius:'1.5rem',cursor:'pointer'}}>🔄 틀린 문제 다시 풀기</button>
-              )}
-              <button onClick={()=>{if(!(incorrectItems.length>0&&!hasReviewed))setStage('select_level');}} disabled={incorrectItems.length>0&&!hasReviewed} className="btn-sticker" style={{padding:'1.3rem',fontSize:'1.6rem',fontWeight:900,background:incorrectItems.length>0&&!hasReviewed?'#E2E8F0':'linear-gradient(135deg,#FF8E53,#FF6B6B)',color:incorrectItems.length>0&&!hasReviewed?'#94A3B8':'white',border:'none',borderBottom:incorrectItems.length>0&&!hasReviewed?'5px solid #CBD5E1':'7px solid #CC4A1A',boxShadow:incorrectItems.length>0&&!hasReviewed?'0 5px 0 #CBD5E1':'0 7px 0 #CC4A1A',borderRadius:'1.5rem',cursor:incorrectItems.length>0&&!hasReviewed?'not-allowed':'pointer'}}>
-                {incorrectItems.length>0&&!hasReviewed?'📋 복습 후 선택 가능':'🎮 단계 선택하기'}
+
+            {/* ── 버튼 2개 좌우 배치 ── */}
+            <div style={{display:'flex',flexDirection:'row',gap:'1rem',marginTop:'1.5rem',width:'100%'}}>
+              <button
+                onClick={()=>{
+                  if(incorrectItems.length===0)return;
+                  setStage('review_wrong'); setHasReviewed(true);
+                  const wt=[...incorrectItems].sort(()=>Math.random()-.5);
+                  setWrongTasks(wt); setCurrentTaskIndex(0); setCurrentTask(wt[0]);
+                  setAttempts(0); attemptsRef.current=0; setUserInput([]); setProgress(0);
+                  speak('틀린 문제들을 다시 한 번 풀어보자!');
+                }}
+                disabled={incorrectItems.length===0}
+                style={{
+                  flex:1, padding:'1.4rem 1rem',
+                  fontSize:'1.6rem', fontWeight:900,
+                  background: incorrectItems.length>0
+                    ? 'linear-gradient(135deg,#818CF8,#6366F1)'
+                    : '#E2E8F0',
+                  color: incorrectItems.length>0 ? 'white' : '#94A3B8',
+                  border:'none',
+                  borderBottom: incorrectItems.length>0 ? '7px solid #3730A3' : '5px solid #CBD5E1',
+                  boxShadow: incorrectItems.length>0 ? '0 7px 0 #3730A3' : '0 5px 0 #CBD5E1',
+                  borderRadius:'1.4rem',
+                  cursor: incorrectItems.length>0 ? 'pointer' : 'not-allowed',
+                  transition:'all 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'
+                }}
+                onMouseEnter={e=>{ if(incorrectItems.length>0){e.currentTarget.style.transform='scale(1.02) translateY(-2px)';} }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1) translateY(0)'; }}
+                onMouseDown={e=>{ if(incorrectItems.length>0){e.currentTarget.style.transform='scale(0.97) translateY(3px)';} }}
+                onMouseUp={e=>{ if(incorrectItems.length>0){e.currentTarget.style.transform='scale(1.02) translateY(-2px)';} }}
+              >
+                🔄 {incorrectItems.length>0 ? '다시 풀기' : '다시 풀기 (없음)'}
+              </button>
+
+              <button
+                onClick={()=>{ if(!(incorrectItems.length>0&&!hasReviewed)) setStage('select_level'); }}
+                disabled={incorrectItems.length>0&&!hasReviewed}
+                style={{
+                  flex:1, padding:'1.4rem 1rem',
+                  fontSize:'1.6rem', fontWeight:900,
+                  background: incorrectItems.length>0&&!hasReviewed
+                    ? '#E2E8F0'
+                    : 'linear-gradient(135deg,#FF8E53,#FF6B6B)',
+                  color: incorrectItems.length>0&&!hasReviewed ? '#94A3B8' : 'white',
+                  border:'none',
+                  borderBottom: incorrectItems.length>0&&!hasReviewed ? '5px solid #CBD5E1' : '7px solid #CC4A1A',
+                  boxShadow: incorrectItems.length>0&&!hasReviewed ? '0 5px 0 #CBD5E1' : '0 7px 0 #CC4A1A',
+                  borderRadius:'1.4rem',
+                  cursor: incorrectItems.length>0&&!hasReviewed ? 'not-allowed' : 'pointer',
+                  transition:'all 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem'
+                }}
+                onMouseEnter={e=>{ if(!(incorrectItems.length>0&&!hasReviewed)){e.currentTarget.style.transform='scale(1.02) translateY(-2px)';} }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1) translateY(0)'; }}
+                onMouseDown={e=>{ if(!(incorrectItems.length>0&&!hasReviewed)){e.currentTarget.style.transform='scale(0.97) translateY(3px)';} }}
+                onMouseUp={e=>{ if(!(incorrectItems.length>0&&!hasReviewed)){e.currentTarget.style.transform='scale(1.02) translateY(-2px)';} }}
+              >
+                {incorrectItems.length>0&&!hasReviewed ? '📋 복습 후 선택 가능' : '🎮 단계 선택하기'}
               </button>
             </div>
           </div>
