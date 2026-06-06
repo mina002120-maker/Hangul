@@ -1261,12 +1261,38 @@
             <div className="modal-enter" style={{background:'white',borderRadius:'2.5rem',padding:'2.5rem',maxWidth:'520px',width:'100%',textAlign:'center',boxShadow:'0 14px 0 #FCA5A5, 0 20px 60px rgba(255,80,80,0.3)',border:'4px solid #FECACA'}}>
               <div style={{fontSize:'5rem',marginBottom:'0.75rem',animation:'heartBeat 1.4s infinite'}}>😮</div>
               <h2 style={{fontSize:'2.5rem',fontWeight:900,color:'#DC2626',marginBottom:'1rem'}}>아차! 틀렸어요</h2>
-              <div style={{background:'#FFF1F2',borderRadius:'1.5rem',padding:'1.5rem',border:'3px dashed #FECACA',marginBottom:'1.5rem'}}>
-                <p style={{fontSize:'1.4rem',fontWeight:700,color:'#374151',lineHeight:1.6}}>
-                  고른 글자는 <span style={{background:'#FEE2E2',color:'#DC2626',padding:'0.2rem 0.8rem',borderRadius:'0.75rem',fontSize:'2rem',fontWeight:900}}>"{lastWrongAnswer}"</span> 예요.
-                  {level===2&&consonants.find(c=>c.char===lastWrongAnswer)&&<span style={{color:'#DC2626',fontWeight:900}}> ({consonants.find(c=>c.char===lastWrongAnswer).name})</span>}
-                </p>
-                <p style={{fontSize:'1.3rem',fontWeight:900,color:'#374151',marginTop:'0.75rem'}}>소리를 다시 잘 들어봐요! 🎧</p>
+              <div style={{background:'#FFF1F2',borderRadius:'1.5rem',padding:'1.2rem',border:'3px dashed #FECACA',marginBottom:'1.5rem',display:'flex',flexDirection:'column',gap:'0.75rem'}}>
+                {/* 고른 글자 크게 표시 */}
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'1rem',flexWrap:'wrap'}}>
+                  {(()=>{
+                    const chars = lastWrongAnswer ? [...lastWrongAnswer] : [];
+                    return chars.map((ch,i) => {
+                      const isC = isConsonant(ch);
+                      const sound = isC ? getConsonantSound(ch) : getVowelSound(ch);
+                      const cInfo = consonants.find(c=>c.char===ch);
+                      return (
+                        <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
+                          <div style={{
+                            width:'5.5rem',height:'5.5rem',borderRadius:'1.2rem',
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontSize:'3.2rem',fontWeight:900,
+                            background: isC ? '#DBEAFE' : '#FCE7F3',
+                            color: isC ? '#1E40AF' : '#9D174D',
+                            border: isC ? '3px solid #93C5FD' : '3px solid #FBCFE8',
+                            boxShadow: isC ? '0 5px 0 #93C5FD' : '0 5px 0 #FBCFE8'
+                          }}>{ch}</div>
+                          <div style={{fontSize:'1.1rem',fontWeight:900,color:'#DC2626'}}>
+                            {sound}{cInfo ? ` (${cInfo.name})` : ''}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                {/* 정답 소리와 비교 */}
+                <div style={{background:'white',borderRadius:'1rem',padding:'0.75rem 1rem',border:'2px solid #FECACA',fontSize:'1.2rem',color:'#374151',fontWeight:700,textAlign:'center'}}>
+                  🎧 소리를 다시 잘 들어봐요!
+                </div>
               </div>
               {attempts<2 ? (
                 <button onClick={()=>{setShowWrongPopup(false);setUserInput([]);}} className="btn-sticker" style={{width:'100%',padding:'1.3rem',fontSize:'1.6rem',fontWeight:900,background:'linear-gradient(135deg,#FB7185,#F43F5E)',color:'white',border:'none',borderBottom:'7px solid #9F1239',boxShadow:'0 7px 0 #9F1239',borderRadius:'1.5rem',cursor:'pointer'}}>🔁 다시 골라보기</button>
@@ -1323,18 +1349,57 @@
               <div style={{padding:'2rem',textAlign:'center',background:voiceFeedback==='perfect'?'#ECFDF5':voiceFeedback==='close'?'#FFFBEB':'#FFF1F2'}}>
                 <div style={{fontSize:'4.5rem',marginBottom:'0.5rem'}}>{voiceFeedback==='perfect'?'🎊':voiceFeedback==='close'?'🙌':'🔄'}</div>
                 <div style={{fontSize:'2.5rem',fontWeight:900,marginBottom:'0.5rem',color:voiceFeedback==='perfect'?'#065F46':voiceFeedback==='close'?'#92400E':'#9F1239'}}>{voiceFeedback==='perfect'?'완벽해요! 🎉':voiceFeedback==='close'?'비슷해요! 😊':'다시 해봐요! 💪'}</div>
-                {voiceFeedback!=='perfect' && (
-                  <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',maxWidth:'360px',margin:'0 auto'}}>
-                    <div style={{background:'white',border:`2px solid ${voiceFeedback==='close'?'#FDE68A':'#FECDD3'}`,borderRadius:'1rem',padding:'0.75rem 1rem',display:'flex',alignItems:'center',gap:'0.75rem'}}>
-                      <span style={{background:voiceFeedback==='close'?'#FDE68A':'#FECDD3',color:voiceFeedback==='close'?'#92400E':'#9F1239',padding:'0.2rem 0.75rem',borderRadius:'999px',fontSize:'0.9rem',fontWeight:900,whiteSpace:'nowrap'}}>내가 말한거</span>
-                      <span style={{fontSize:'1.4rem',fontWeight:900,color:'#374151',flex:1,textAlign:'left',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{voiceText||'(작은 소리)'}</span>
-                    </div>
-                    <div style={{background:'white',border:'2px solid #BBF7D0',borderRadius:'1rem',padding:'0.75rem 1rem',display:'flex',alignItems:'center',gap:'0.75rem'}}>
-                      <span style={{background:'#BBF7D0',color:'#166534',padding:'0.2rem 0.75rem',borderRadius:'999px',fontSize:'0.9rem',fontWeight:900,whiteSpace:'nowrap'}}>정답</span>
-                      <span style={{fontSize:'1.5rem',fontWeight:900,color:'#166534',flex:1,textAlign:'left'}}>{currentTask&&currentTask.char}</span>
-                    </div>
+                {/* 항상 내 소리 vs 정답 비교 표시 */}
+                <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',maxWidth:'380px',margin:'0 auto',width:'100%'}}>
+                  {/* 내가 말한 소리 */}
+                  <div style={{
+                    background:'white',
+                    border:`2px solid ${voiceFeedback==='perfect'?'#6EE7B7':voiceFeedback==='close'?'#FDE68A':'#FECDD3'}`,
+                    borderRadius:'1rem',padding:'0.8rem 1.1rem',
+                    display:'flex',alignItems:'center',gap:'0.75rem'
+                  }}>
+                    <span style={{
+                      background:voiceFeedback==='perfect'?'#6EE7B7':voiceFeedback==='close'?'#FDE68A':'#FECDD3',
+                      color:voiceFeedback==='perfect'?'#065F46':voiceFeedback==='close'?'#92400E':'#9F1239',
+                      padding:'0.25rem 0.8rem',borderRadius:'999px',
+                      fontSize:'1rem',fontWeight:900,whiteSpace:'nowrap',flexShrink:0
+                    }}>🎤 내 소리</span>
+                    <span style={{
+                      fontSize:'1.5rem',fontWeight:900,
+                      color:voiceFeedback==='perfect'?'#065F46':voiceFeedback==='close'?'#92400E':'#9F1239',
+                      flex:1,textAlign:'left',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
+                    }}>{voiceText||'(작은 소리)'}</span>
                   </div>
-                )}
+                  {/* 정답 */}
+                  <div style={{
+                    background:'white',border:'2px solid #BBF7D0',
+                    borderRadius:'1rem',padding:'0.8rem 1.1rem',
+                    display:'flex',alignItems:'center',gap:'0.75rem'
+                  }}>
+                    <span style={{
+                      background:'#BBF7D0',color:'#166534',
+                      padding:'0.25rem 0.8rem',borderRadius:'999px',
+                      fontSize:'1rem',fontWeight:900,whiteSpace:'nowrap',flexShrink:0
+                    }}>✅ 정답</span>
+                    <span style={{
+                      fontSize:'1.5rem',fontWeight:900,color:'#166534',
+                      flex:1,textAlign:'left'
+                    }}>{currentTask&&currentTask.char}</span>
+                    {/* 정답의 소리도 함께 표시 */}
+                    {currentTask&&level<=2&&(
+                      <span style={{
+                        fontSize:'1.1rem',fontWeight:900,color:'#166534',
+                        background:'#F0FDF4',padding:'0.2rem 0.7rem',
+                        borderRadius:'999px',flexShrink:0
+                      }}>
+                        {isConsonant(currentTask.char)
+                          ? `${getConsonantSound(currentTask.char)} (${consonants.find(c=>c.char===currentTask.char)?.name||''})`
+                          : getVowelSound(currentTask.char)
+                        }
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <div style={{padding:'1rem 1.5rem 1.5rem',display:'flex',flexDirection:'column',gap:'0.6rem'}}>
                 {voiceFeedback!=='perfect' && <button onClick={startRecording} className="btn-sticker" style={{width:'100%',padding:'1rem',fontSize:'1.4rem',fontWeight:900,background:voiceFeedback==='close'?'linear-gradient(135deg,#FBBF24,#F59E0B)':'linear-gradient(135deg,#FB7185,#F43F5E)',color:'white',border:'none',borderBottom:voiceFeedback==='close'?'6px solid #B45309':'6px solid #9F1239',boxShadow:voiceFeedback==='close'?'0 6px 0 #B45309':'0 6px 0 #9F1239',borderRadius:'1.2rem',cursor:'pointer'}}>🎤 다시 녹음하기</button>}
