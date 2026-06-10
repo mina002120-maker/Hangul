@@ -398,7 +398,10 @@
     // GitHub Pages 환경 — getStudentsList는 GET, 나머지는 POST
     if (action === 'getStudentsList') {
       return fetch(window.GAS_API_URL + '?action=getStudentsList')
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          return r.json();
+        })
         .then(r => { if (!r.success) throw new Error(r.error || 'API 오류'); return r.data; });
     }
     const body = new URLSearchParams({ action, payload: JSON.stringify(payload) });
@@ -496,11 +499,35 @@
     const autoTimerRef = useRef(null);
     const micGrantedRef = useRef(false);
 
-    useEffect(() => {
+    // ── 명단 로딩 함수 (재시도 가능)
+    const loadStudents = () => {
+      setIsLoadingNames(true);
+      // GAS URL 미설정 체크
+      if (!window.GAS_API_URL || window.GAS_API_URL === '__SHEET_API_URL__') {
+        console.error('[명단] GAS_API_URL이 설정되지 않았습니다.');
+        setStudents([]);
+        setIsLoadingNames(false);
+        return;
+      }
       callGAS('getStudentsList')
-        .then(data => { if (data && data.length > 0) setStudents(data); setIsLoadingNames(false); })
-        .catch(() => { setStudents([{num:1,name:'홍길동'},{num:2,name:'김철수'},{num:3,name:'이영희'}]); setIsLoadingNames(false); });
-    }, []);
+        .then(data => {
+          console.log('[명단] 수신 데이터:', data);
+          if (Array.isArray(data) && data.length > 0) {
+            setStudents(data);
+          } else {
+            console.warn('[명단] 빈 배열 또는 잘못된 형식:', data);
+            setStudents([]);
+          }
+          setIsLoadingNames(false);
+        })
+        .catch(err => {
+          console.error('[명단] 로딩 오류:', err);
+          setStudents([]);
+          setIsLoadingNames(false);
+        });
+    };
+
+    useEffect(() => { loadStudents(); }, []);
 
     useEffect(() => {
       if (stage === 'select_name' && !micGrantedRef.current && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -960,6 +987,14 @@
             <div style={{background:'white',borderRadius:'2.5rem',padding:'2.5rem 2rem',width:'100%',boxShadow:'0 12px 0 #FFD4A3, 0 20px 50px rgba(255,150,80,0.2)',border:'3px solid #FFE4C8'}}>
               <PencilFairy/>
               <h2 style={{fontSize:'2.2rem',fontWeight:900,color:'#1E293B',margin:'1rem 0 0.5rem'}}>누가 공부하러 왔을까요? 🤔</h2>
+              {/* GAS URL 상태 디버그 표시 */}
+              {(!window.GAS_API_URL || window.GAS_API_URL === '__SHEET_API_URL__') && (
+                <div style={{background:'#FEF2F2',border:'2px solid #FECACA',borderRadius:'0.9rem',padding:'0.7rem 1rem',marginBottom:'0.5rem',fontSize:'0.9rem',color:'#991B1B',textAlign:'left',lineHeight:1.5}}>
+                  ⚠️ <b>GAS URL이 연결되지 않았습니다.</b><br/>
+                  GitHub Secret <code>SHEET_API_URL</code> 을 설정하고 Actions로 재배포하거나,<br/>
+                  구글 시트에서 직접 앱을 열어 사용하세요.
+                </div>
+              )}
               <p style={{fontSize:'1.3rem',fontWeight:700,color:'#94A3B8',margin:'0 0 1.5rem'}}>이름을 골라보세요!</p>
               <div style={{position:'relative',marginBottom:'1.5rem'}}>
                 {isLoadingNames ? (
@@ -971,16 +1006,14 @@
                   <div style={{background:'#FFF7ED',border:'2px solid #FED7AA',borderRadius:'1.2rem',padding:'1.2rem',textAlign:'center'}}>
                     <div style={{fontSize:'2rem',marginBottom:'0.5rem'}}>⚠️</div>
                     <p style={{fontSize:'1.1rem',fontWeight:900,color:'#C2410C',marginBottom:'0.3rem'}}>명단을 불러오지 못했어요</p>
-                    <p style={{fontSize:'0.95rem',color:'#92400E',lineHeight:1.5}}>
-                      구글 시트 <b>명단</b> 탭에 번호·이름이 있는지,<br/>
-                      GAS URL이 올바르게 설정됐는지 확인해 주세요.
+                    <p style={{fontSize:'0.95rem',color:'#92400E',lineHeight:1.7}}>
+                      아래 항목을 순서대로 확인해 주세요.<br/>
+                      <b>1.</b> 구글 시트 <b>명단</b> 탭에 번호·이름이 있는지<br/>
+                      <b>2.</b> GAS 배포 시 액세스: <b>모든 사용자</b> 로 설정했는지<br/>
+                      <b>3.</b> GitHub Secret <b>SHEET_API_URL</b> 값이 올바른지<br/>
+                      <b>4.</b> GitHub Actions 배포가 성공(✅)했는지
                     </p>
-                    <button onClick={()=>{
-                      setIsLoadingNames(true);
-                      callGAS('getStudentsList')
-                        .then(data=>{ setStudents(data&&data.length>0?data:[]); setIsLoadingNames(false); })
-                        .catch(()=>{ setStudents([]); setIsLoadingNames(false); });
-                    }} style={{marginTop:'0.8rem',padding:'0.6rem 1.4rem',background:'#FF8E53',color:'white',border:'none',borderRadius:'0.9rem',fontSize:'1rem',fontWeight:900,cursor:'pointer'}}>
+                    <button onClick={loadStudents} style={{marginTop:'0.8rem',padding:'0.6rem 1.4rem',background:'#FF8E53',color:'white',border:'none',borderRadius:'0.9rem',fontSize:'1rem',fontWeight:900,cursor:'pointer'}}>
                       🔄 다시 시도
                     </button>
                   </div>
