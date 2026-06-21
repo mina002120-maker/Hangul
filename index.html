@@ -1896,10 +1896,47 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    /* ── App code is identical to the GAS version ── */
     const { useState, useCallback, useEffect, useRef } = React;
     const { createRoot } = ReactDOM;
 
+    // ── 데이터 정의 ──
+    const consonants = [
+      { char: 'ㄱ', sound: '그', name: '기역' }, { char: 'ㄴ', sound: '느', name: '니은' },
+      { char: 'ㄷ', sound: '드', name: '디귿' }, { char: 'ㄹ', sound: '르', name: '리을' },
+      { char: 'ㅁ', sound: '므', name: '미음' }, { char: 'ㅂ', sound: '브', name: '비읍' },
+      { char: 'ㅅ', sound: '스', name: '시옷' }, { char: 'ㅇ', sound: '으', name: '이응' },
+      { char: 'ㅈ', sound: '즈', name: '지읒' }, { char: 'ㅊ', sound: '츠', name: '치읓' },
+      { char: 'ㅋ', sound: '크', name: '키읔' }, { char: 'ㅌ', sound: '트', name: '티읕' },
+      { char: 'ㅍ', sound: '프', name: '피읖' }, { char: 'ㅎ', sound: '흐', name: '히읗' }
+    ];
+    const vowels = [
+      { char: 'ㅏ', sound: '아' }, { char: 'ㅑ', sound: '야' }, { char: 'ㅓ', sound: '어' },
+      { char: 'ㅕ', sound: '여' }, { char: 'ㅗ', sound: '오' }, { char: 'ㅛ', sound: '요' },
+      { char: 'ㅜ', sound: '우' }, { char: 'ㅠ', sound: '유' }, { char: 'ㅡ', sound: '으' }, { char: 'ㅣ', sound: '이' }
+    ];
+
+    const levelData = {
+      1: { name: '1단계: 모음 소리', items: vowels },
+      2: { name: '2단계: 자음 소리', items: consonants },
+      3: {
+        name: '3단계: 한 글자 단어', items: [
+          { char: '가', sound: '가', parts: ['ㄱ', 'ㅏ'] }, { char: '나', sound: '나', parts: ['ㄴ', 'ㅏ'] },
+          { char: '도', sound: '도', parts: ['ㄷ', 'ㅗ'] }, { char: '미', sound: '미', parts: ['ㅁ', 'ㅣ'] },
+          { char: '부', sound: '부', parts: ['ㅂ', 'ㅜ'] }, { char: '서', sound: '서', parts: ['ㅅ', 'ㅓ'] },
+          { char: '조', sound: '조', parts: ['ㅈ', 'ㅗ'] }, { char: '하', sound: '하', parts: ['ㅎ', 'ㅏ'] }
+        ]
+      },
+      4: {
+        name: '4단계: 두 글자 단어', items: [
+          { char: '나비', sound: '나비', parts: ['ㄴ', 'ㅏ', 'ㅂ', 'ㅣ'] }, { char: '우유', sound: '우유', parts: ['ㅇ', 'ㅜ', 'ㅇ', 'ㅠ'] },
+          { char: '머리', sound: '머리', parts: ['ㅁ', 'ㅓ', 'ㄹ', 'ㅣ'] }, { char: '하마', sound: '하마', parts: ['ㅎ', 'ㅏ', 'ㅁ', 'ㅏ'] },
+          { char: '기차', sound: '기차', parts: ['ㄱ', 'ㅣ', 'ㅊ', 'ㅏ'] }, { char: '포도', sound: '포도', parts: ['ㅍ', 'ㅗ', 'ㄷ', 'ㅗ'] },
+          { char: '오리', sound: '오리', parts: ['ㅇ', 'ㅗ', 'ㄹ', 'ㅣ'] }
+        ]
+      }
+    };
+
+    // ── 통신 함수 (JSONP) ──
     const callGAS = (action, payload = {}) => {
       const url = window.getGasUrl();
       if (!url || url.includes('__SHEET_API_URL__')) {
@@ -1977,8 +2014,6 @@
         </svg>
       </div>
     );
-
-    // ── Icon components ──────────────────────────────────────────
     const Volume2 = ({ size = 24, className = '' }) => <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>;
     const VolumeX = ({ size = 24, className = '' }) => <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></svg>;
     const RefreshCw = ({ size = 24, className = '' }) => <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>;
@@ -2139,45 +2174,6 @@
       }, [isMuted]);
 
       useEffect(() => () => { if (window.speechSynthesis) window.speechSynthesis.cancel(); }, []);
-
-      const consonants = [
-        { char: 'ㄱ', sound: '그', name: '기역' }, { char: 'ㄴ', sound: '느', name: '니은' },
-        { char: 'ㄷ', sound: '드', name: '디귿' }, { char: 'ㄹ', sound: '르', name: '리을' },
-        { char: 'ㅁ', sound: '므', name: '미음' }, { char: 'ㅂ', sound: '브', name: '비읍' },
-        { char: 'ㅅ', sound: '스', name: '시옷' }, { char: 'ㅇ', sound: '으', name: '이응' },
-        { char: 'ㅈ', sound: '즈', name: '지읒' }, { char: 'ㅊ', sound: '츠', name: '치읓' },
-        { char: 'ㅋ', sound: '크', name: '키읔' }, { char: 'ㅌ', sound: '트', name: '티읕' },
-        { char: 'ㅍ', sound: '프', name: '피읖' }, { char: 'ㅎ', sound: '흐', name: '히읗' }
-      ];
-      const vowels = [
-        { char: 'ㅏ', sound: '아' }, { char: 'ㅑ', sound: '야' }, { char: 'ㅓ', sound: '어' },
-        { char: 'ㅕ', sound: '여' }, { char: 'ㅗ', sound: '오' }, { char: 'ㅛ', sound: '요' },
-        { char: 'ㅜ', sound: '우' }, { char: 'ㅠ', sound: '유' }, { char: 'ㅡ', sound: '으' }, { char: 'ㅣ', sound: '이' }
-      ];
-      /* --------------------------------------------------
-             로그인
-          build:GEGHS-DEEPE-2026 / (c) GEG 화성(깊이 e끌림)
-          -------------------------------------------------- */
-      const levelData = {
-        1: { name: '1단계: 모음 소리', items: vowels },
-        2: { name: '2단계: 자음 소리', items: consonants },
-        3: {
-          name: '3단계: 한 글자 단어', items: [
-            { char: '가', sound: '가', parts: ['ㄱ', 'ㅏ'] }, { char: '나', sound: '나', parts: ['ㄴ', 'ㅏ'] },
-            { char: '도', sound: '도', parts: ['ㄷ', 'ㅗ'] }, { char: '미', sound: '미', parts: ['ㅁ', 'ㅣ'] },
-            { char: '부', sound: '부', parts: ['ㅂ', 'ㅜ'] }, { char: '서', sound: '서', parts: ['ㅅ', 'ㅓ'] },
-            { char: '조', sound: '조', parts: ['ㅈ', 'ㅗ'] }, { char: '하', sound: '하', parts: ['ㅎ', 'ㅏ'] }
-          ]
-        },
-        4: {
-          name: '4단계: 두 글자 단어', items: [
-            { char: '나비', sound: '나비', parts: ['ㄴ', 'ㅏ', 'ㅂ', 'ㅣ'] }, { char: '우유', sound: '우유', parts: ['ㅇ', 'ㅜ', 'ㅇ', 'ㅠ'] },
-            { char: '머리', sound: '머리', parts: ['ㅁ', 'ㅓ', 'ㄹ', 'ㅣ'] }, { char: '하마', sound: '하마', parts: ['ㅎ', 'ㅏ', 'ㅁ', 'ㅏ'] },
-            { char: '기차', sound: '기차', parts: ['ㄱ', 'ㅣ', 'ㅊ', 'ㅏ'] }, { char: '포도', sound: '포도', parts: ['ㅍ', 'ㅗ', 'ㄷ', 'ㅗ'] },
-            { char: '오리', sound: '오리', parts: ['ㅇ', 'ㅗ', 'ㄹ', 'ㅣ'] }
-          ]
-        }
-      };
 
       const isConsonant = char => consonants.some(c => c.char === char);
       const isVowelSide = v => ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅣ'].includes(v);
@@ -3223,8 +3219,26 @@
         </div>
       );
     };
-    const root = createRoot(document.getElementById('root'));
-    root.render(<App />);
+    const Container = () => {
+      try {
+        return <App />;
+      } catch (e) {
+        return (
+          <div style={{ padding: '2rem', color: 'red' }}>
+            <h2>React Error</h2>
+            <pre>{e.stack}</pre>
+          </div>
+        );
+      }
+    };
+
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      const root = createRoot(rootElement);
+      root.render(<Container />);
+    } else {
+      document.body.innerHTML = '<h2 style="color:red;padding:2rem;">Root element not found!</h2>';
+    }
   </script>
 </body>
 
