@@ -30,12 +30,26 @@
     rel="stylesheet">
 
   <!-- React 18 + ReactDOM (CDN) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <!-- canvas-confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Babel for JSX (standalone) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.5/babel.min.js"></script>
+
+  <script>
+    // 라이브러리 로드 체크
+    window.addEventListener('load', () => {
+      if (!window.React || !window.ReactDOM || !window.Babel) {
+        document.body.innerHTML += `
+          <div style="background: #FFFBEB; border: 2px solid #F59E0B; padding: 1.5rem; margin: 1.5rem; border-radius: 1rem; color: #92400E;">
+            <h3>⚠️ 라이브러리를 불러오지 못했습니다</h3>
+            <p>인터넷 연결을 확인하시거나 새로고침을 해주세요.</p>
+          </div>
+        `;
+      }
+    });
+  </script>
 
   <style>
     html {
@@ -1893,7 +1907,29 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root" style="padding: 2rem; text-align: center; font-family: sans-serif; color: #64748B;">
+    <h3>🚀 한글자모탐험을 불러오고 있습니다...</h3>
+    <p>잠시만 기다려 주세요. 화면이 계속 바뀌지 않으면 "새로고침"을 해주세요.</p>
+  </div>
+
+  <script>
+    // 전역 에러 캐치 (바벨 로딩 전/후 모든 에러)
+    window.onerror = function (msg, url, line, col, error) {
+      const root = document.getElementById('root');
+      if (root) {
+        root.innerHTML = `
+          <div style="background: #FEF2F2; border: 2px solid #FECACA; padding: 2rem; margin: 2rem; border-radius: 1.5rem; color: #991B1B; text-align: left; font-family: sans-serif;">
+            <h2 style="margin-top:0;">⚠️ 앱 실행 중 오류가 발생했습니다</h2>
+            <p><strong>에러 메시지:</strong> ${msg}</p>
+            <p><strong>위치:</strong> ${url} (Line: ${line})</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: #64748B;">* 브라우저의 개발자 도구(F12) 콘솔창에서 더 자세한 내용을 확인할 수 있습니다.</p>
+            <button onclick="location.reload()" style="padding: 0.8rem 1.5rem; background: #991B1B; color: white; border: none; border-radius: 0.8rem; cursor: pointer; font-weight: bold; margin-top: 1rem;">다시 시도하기</button>
+          </div>
+        `;
+      }
+      return false;
+    };
+  </script>
 
   <script type="text/babel">
     const { useState, useCallback, useEffect, useRef } = React;
